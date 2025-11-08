@@ -105,3 +105,8 @@ $RECYCLE.BIN/
 
 # weights
 Assets/StreamingAssets/Whisper/
+
+
+# backend
+arai-backend/node_modules/
+arai-backend/.env
