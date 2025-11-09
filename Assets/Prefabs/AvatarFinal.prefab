@@ -2059,7 +2059,7 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  outputSoundGain: 0
+  outputSoundGain: 1
   audioSourceProxy: {fileID: 0}
 --- !u!114 &8143822418600691606
 MonoBehaviour:

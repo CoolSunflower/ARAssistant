@@ -22,6 +22,9 @@ public class WhisperStreamSTT : MonoBehaviour
     public float chunkSec = 2.0f;               // partial window length
     public float hopSec = 1.0f;                 // stride between partials (overlap = chunkSec - hopSec)
 
+    [Header("Events")]
+    public static System.Action<string> OnFinalUtterance; 
+
     private string micDevice;
     private AudioClip ringClip;                 // looping microphone capture
     private bool isRecording = false;
@@ -110,7 +113,7 @@ public class WhisperStreamSTT : MonoBehaviour
 
             if (elapsed < hopSec)
                 continue; // wait until hop interval
-            
+
             elapsed = 0f; // reset for next hop
 
             // Exit early if recording stopped during the wait
@@ -150,6 +153,7 @@ public class WhisperStreamSTT : MonoBehaviour
         var text = ExtractWhisperText(result);
         partialText.text = "";
         finalText.text = string.IsNullOrEmpty(text) ? "(no text)" : text;
+        OnFinalUtterance?.Invoke(finalText.text);
     }
 
     // ---- helpers ----

@@ -4,10 +4,11 @@ Current Progress:
 - Bottom button currently does not do anything [See Older Commit]
 - Remove lip sync with human user audio as that was just for testing (disabled buttons)
 - Add STT using bottom button & debug info. [In Progress]
+- LLM backend
+- Local TTS on Android -> AudioClip -> uLipSync [Working for Chat Endpoint]
 
 Next steps:
-- LLM backend
-- Local TTS on Android -> AudioClip -> uLipSync
+- Local TTS on Android -> AudioClip -> uLipSync [For Streaming]
 - Default animation of agent
 - End to end testing
 - Adding Sign Language and Gesture detection to backend
