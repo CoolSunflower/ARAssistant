@@ -1,7 +1,8 @@
 using UnityEngine;
 using System;
-using System.IO;
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 
 public class LocalAndroidTTSStreamer : MonoBehaviour
 {
@@ -10,14 +11,13 @@ public class LocalAndroidTTSStreamer : MonoBehaviour
 #endif
 
     [Header("Output")]
-    public StreamingAudioPlayer player;   // assign your AudioStream GO here
+    public StreamingAudioPlayer player;
 
-    [Header("Engine (optional)")]
-    // You can still pick engine in Android settings. Leave blank here for compatibility.
+    [Header("Engine (leave blank; pick engine in device settings)")]
     public string enginePackage = "";
 
-    // Fallback WAV parsing
-    struct WavInfo { public int sampleRate; public int channels; public int dataOffset; public int dataSize; }
+    Queue<string> pending = new Queue<string>();
+    bool running;
 
     void Awake()
     {
@@ -25,67 +25,109 @@ public class LocalAndroidTTSStreamer : MonoBehaviour
         using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
 
-        var onInit = new OnInitListener(() => Debug.Log("[TTS] init (fallback)"));
-        // 2-arg ctor is safest across OEMs
+        var onInit = new OnInitListener(() => Debug.Log("[TTS] init (fallback file mode)"));
+
+        // Use safest 2-arg ctor; engine selection via device settings avoids OEM quirks
         tts = new AndroidJavaObject("android.speech.tts.TextToSpeech", activity, onInit);
 #endif
     }
 
     public void ResetStream()
     {
+        pending.Clear();
+        running = false;
         if (player) player.ResetStream();
     }
 
-    // Speak small chunk -> synthesize to WAV file -> enqueue PCM16 to ring buffer
+    /// <summary>Queue one text chunk; processed strictly in-order.</summary>
     public void SpeakChunk(string text)
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
-        if (string.IsNullOrWhiteSpace(text) || player == null) return;
+        if (string.IsNullOrWhiteSpace(text))
+            return;
 
-        try
+        pending.Enqueue(text);
+        if (!running)
         {
-            string cacheDir = activity.Call<AndroidJavaObject>("getCacheDir").Call<string>("getAbsolutePath");
-            string id = Guid.NewGuid().ToString("N");
-            string path = Path.Combine(cacheDir, $"tts_{id}.wav");
-
-            var fileObj = new AndroidJavaObject("java.io.File", path);
-            var bundle  = new AndroidJavaObject("android.os.Bundle");
-
-            // API 21+: synthesizeToFile(CharSequence, Bundle, File, String)
-            int code = tts.Call<int>("synthesizeToFile", text, bundle, fileObj, id);
-            if (code < 0) { Debug.LogWarning("[TTS] synthesizeToFile returned " + code); return; }
-
-            StartCoroutine(WaitAndPlay(path));
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("[TTS] synthesizeToFile error: " + e.Message);
+            running = true;
+            StartCoroutine(RunQueue());
         }
 #else
-        Debug.Log("Editor SpeakChunk: " + text);
+        Debug.Log("[TTS] (Editor) would speak: " + text);
 #endif
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-    IEnumerator WaitAndPlay(string wavPath)
+    IEnumerator RunQueue()
     {
-        // Wait for file creation
-        float timeout = 10f, t = 0f;
-        FileInfo fi = new FileInfo(wavPath);
+        while (pending.Count > 0)
+        {
+            var text = pending.Dequeue();
+            yield return SynthesizeAndEnqueue(text);
+        }
+        running = false;
+    }
+
+    IEnumerator SynthesizeAndEnqueue(string text)
+    {
+        if (player == null)
+        {
+            Debug.LogError("[TTS] No StreamingAudioPlayer assigned");
+            yield break;
+        }
+
+        string cacheDir = activity.Call<AndroidJavaObject>("getCacheDir").Call<string>("getAbsolutePath");
+        string id = Guid.NewGuid().ToString("N");
+        string wavPath = Path.Combine(cacheDir, $"tts_{id}.wav");
+
+        var fileObj = new AndroidJavaObject("java.io.File", wavPath);
+        var bundle  = new AndroidJavaObject("android.os.Bundle");
+
+        // synthesizeToFile(CharSequence, Bundle, File, String)  (API 21+)
+        int code = -999;
+        try
+        {
+            code = tts.Call<int>("synthesizeToFile", text, bundle, fileObj, id);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("[TTS] synthesizeToFile JNI error: " + e.Message);
+            yield break;
+        }
+
+        if (code < 0)
+        {
+            // -2 often means "busy"; we can wait a bit and retry once
+            Debug.LogWarning("[TTS] synthesizeToFile returned " + code + " (text=\"" + Trunc(text) + "\")");
+            if (code == -2)
+            {
+                yield return new WaitForSeconds(0.2f);
+                try { code = tts.Call<int>("synthesizeToFile", text, bundle, fileObj, id); }
+                catch (Exception e) { Debug.LogError("[TTS] retry failed: " + e.Message); yield break; }
+                if (code < 0) yield break;
+            }
+        }
+
+        // Wait for the file to appear
+        var fi = new FileInfo(wavPath);
+        float timeout = 15f, t = 0f;
         while (!fi.Exists && t < timeout)
         {
             yield return new WaitForSeconds(0.05f);
             fi.Refresh(); t += 0.05f;
         }
-        if (!fi.Exists) { Debug.LogError("[TTS] file not created: " + wavPath); yield break; }
+        if (!fi.Exists)
+        {
+            Debug.LogError("[TTS] file not created: " + wavPath);
+            yield break;
+        }
 
-        // Wait until size stabilizes (finished writing)
-        long last = -1;
-        int stable = 0;
+        // Wait until size stabilizes (writing complete)
+        long last = -1; int stable = 0;
         while (t < timeout)
         {
             fi.Refresh();
-            if (fi.Length > 44 && fi.Length == last) { stable++; if (stable >= 3) break; } // ~150ms stable
+            if (fi.Length > 44 && fi.Length == last) { stable++; if (stable >= 3) break; }
             else { stable = 0; }
             last = fi.Length;
             yield return new WaitForSeconds(0.05f);
@@ -97,77 +139,78 @@ public class LocalAndroidTTSStreamer : MonoBehaviour
         catch (Exception e) { Debug.LogError("[TTS] read failed: " + e.Message); yield break; }
         finally { try { File.Delete(wavPath); } catch { } }
 
-        if (bytes.Length < 44) { Debug.LogError("[TTS] bad wav size: " + bytes.Length); yield break; }
-
-        if (!TryParseWavHeader(bytes, out var info))
+        if (!TryParseWavPcm16(bytes, out int sr, out int ch, out int dataOffset, out int dataSize))
         {
-            Debug.LogError("[TTS] invalid WAV header");
+            Debug.LogError("[TTS] invalid WAV (not PCM16): " + bytes.Length + " bytes");
             yield break;
         }
 
-        // Configure player on first chunk
-        player.Configure(info.sampleRate, info.channels);
+        // Configure on first chunk / on format change
+        player.Configure(sr, ch);
 
-        // Enqueue PCM16 (strip header)
-        int dataLen = Mathf.Min(info.dataSize, bytes.Length - info.dataOffset);
-        var pcm = new byte[dataLen];
-        Buffer.BlockCopy(bytes, info.dataOffset, pcm, 0, dataLen);
+        int len = Mathf.Min(dataSize, bytes.Length - dataOffset);
+        var pcm = new byte[len];
+        Buffer.BlockCopy(bytes, dataOffset, pcm, 0, len);
         player.EnqueuePcm16(pcm);
+
+        Debug.Log($"[TTS] Enqueued {len} bytes (sr={sr}, ch={ch}) text=\"{Trunc(text)}\"");
     }
 
-    static bool TryParseWavHeader(byte[] b, out WavInfo i)
+    static string Trunc(string s) => s.Length > 48 ? s.Substring(0, 48) + "..." : s;
+
+    // -------- WAV PCM16 parser (complete) --------
+    static bool TryParseWavPcm16(byte[] b, out int sampleRate, out int channels, out int dataOffset, out int dataSize)
     {
-        i = default;
-        // Minimal RIFF/WAVE/fmt/data parser
-        if (b.Length < 44) return false;
+        sampleRate = channels = dataOffset = dataSize = 0;
+        if (b == null || b.Length < 44) return false;
+
         int p = 0;
         if (ReadTag(b, ref p) != "RIFF") return false;
         p += 4; // file size
         if (ReadTag(b, ref p) != "WAVE") return false;
 
-        // find "fmt " chunk
+        int fmtFound = 0;
         while (p + 8 <= b.Length)
         {
             string tag = ReadTag(b, ref p);
-            int size = ReadInt(b, ref p);
+            int size = ReadLE32(b, ref p);
             if (tag == "fmt ")
             {
-                int audioFormat = ReadShort(b, ref p);
-                i.channels      = ReadShort(b, ref p);
-                i.sampleRate    = ReadInt(b, ref p);
-                p += 6; // byte rate(4) + block align(2)
-                int bitsPerSample = ReadShort(b, ref p);
+                if (p + size > b.Length) return false;
+                int audioFormat = ReadLE16(b, ref p);   // 1 = PCM
+                channels = ReadLE16(b, ref p);
+                sampleRate = ReadLE32(b, ref p);
+                int byteRate = ReadLE32(b, ref p);
+                int blockAlign = ReadLE16(b, ref p);
+                int bitsPerSample = ReadLE16(b, ref p);
+
                 int extra = size - 16;
                 if (extra > 0) p += extra;
-                if (audioFormat != 1 || bitsPerSample != 16) return false; // PCM16 only
+
+                if (audioFormat != 1 || (bitsPerSample != 16)) return false;
+                fmtFound = 1;
             }
             else if (tag == "data")
             {
-                i.dataSize   = size;
-                i.dataOffset = p;
-                return i.sampleRate > 0 && i.channels > 0 && i.dataSize > 0;
+                if (p + size > b.Length) size = b.Length - p;
+                dataOffset = p;
+                dataSize = size;
+                return (fmtFound == 1) && sampleRate > 0 && channels > 0 && dataSize > 0;
             }
             else
             {
+                // skip unknown chunk
                 p += size;
             }
         }
         return false;
     }
 
-    static string ReadTag(byte[] b, ref int p)
-    {
-        var s = System.Text.Encoding.ASCII.GetString(b, p, 4); p += 4; return s;
-    }
-    static int ReadInt(byte[] b, ref int p)
-    {
-        int v = b[p] | (b[p+1] << 8) | (b[p+2] << 16) | (b[p+3] << 24); p += 4; return v;
-    }
-    static short ReadShort(byte[] b, ref int p)
-    {
-        short v = (short)(b[p] | (b[p+1] << 8)); p += 2; return v;
-    }
+    static string ReadTag(byte[] b, ref int p) { var s = System.Text.Encoding.ASCII.GetString(b, p, 4); p += 4; return s; }
+    static int ReadLE32(byte[] b, ref int p) { int v = b[p] | (b[p+1] << 8) | (b[p+2] << 16) | (b[p+3] << 24); p += 4; return v; }
+    static int ReadLE16(byte[] b, ref int p) { int v = b[p] | (b[p+1] << 8); p += 2; return v; }
 
+    // ---------- Android proxies ----------
     class OnInitListener : AndroidJavaProxy
     {
         readonly Action cb;
