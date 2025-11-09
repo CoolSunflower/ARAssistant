@@ -80,11 +80,19 @@ async function handleChat(req, env) {
     }
 
     const data = await r.json();
-    const out = extractFinalText(data);
-    return withCORS(new Response(out, {
-      status: 200,
-      headers: { "Content-Type": "text/plain; charset=utf-8", ...CORS_HEADERS },
-    }));
+    console.log(data);
+    let reply = "";
+    try {
+      reply = data.choices?.[0]?.message?.content?.[0]?.text?.value || 
+              data.choices?.[0]?.message?.content?.[0]?.text || 
+              data.choices?.[0]?.message?.content || 
+              data.output?.[0]?.content?.[0]?.text ||
+              JSON.stringify(data);
+    } catch(e) { reply = JSON.stringify(data); }
+
+    return new Response(reply.trim(), {
+      headers: { "Content-Type": "text/plain" },
+    });
   } catch (e) {
     return withCORS(new Response("Server error: " + (e?.message || e), { status: 500 }));
   }
