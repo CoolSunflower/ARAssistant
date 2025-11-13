@@ -11,7 +11,7 @@ public class AssistantStreamController : MonoBehaviour
     bool llmBusy;  // <— NEW: disable button during /chat network call
     public UnityEngine.UI.Image speakButtonImage;
 
-    public WhisperStreamSTT whisper;
+    public STTBridge whisper;
     public ARReticleAndPlace placer;
     public TMP_Text finalTextUI;
 
@@ -34,8 +34,8 @@ public class AssistantStreamController : MonoBehaviour
 
     void OnEnable()
     {
-        WhisperStreamSTT.OnFinalUtterance += OnUserFinalText;
-        WhisperStreamSTT.OnSttBusyChanged += OnSttBusyChanged;   // <— add
+        STTBridge.OnFinalUtterance += OnUserFinalText;
+        STTBridge.OnSttBusyChanged += OnSttBusyChanged;
     }
 
     void Update()
@@ -70,8 +70,8 @@ public class AssistantStreamController : MonoBehaviour
 
     void OnDisable()
     {
-        WhisperStreamSTT.OnFinalUtterance -= OnUserFinalText;
-        WhisperStreamSTT.OnSttBusyChanged -= OnSttBusyChanged;   // <— add
+        STTBridge.OnFinalUtterance -= OnUserFinalText;
+        STTBridge.OnSttBusyChanged -= OnSttBusyChanged;
     }
 
     void OnSttBusyChanged(bool busy) { sttBusy = busy; }
@@ -86,6 +86,13 @@ public class AssistantStreamController : MonoBehaviour
         if (speakButton) speakButton.interactable = false;   // disable during request+speech
         StartChatOnce(text);
     }
+
+    public void OnTapSpeak()
+    {
+        if (whisper == null) return;
+        whisper.OnToggleRecord();  // start/stop native Android STT
+    }
+
 
     void EnsureAvatarAudioBinding()
     {

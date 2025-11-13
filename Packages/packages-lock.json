@@ -237,6 +237,13 @@
       "dependencies": {},
       "hash": "529a628a915a97799e89e061af9cb7c71407124d"
     },
+    "com.yasirkula.speechtotext": {
+      "version": "https://github.com/yasirkula/UnitySpeechToText.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "511736fbefd300c0ef169689f0851e99357976c3"
+    },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
       "depth": 0,

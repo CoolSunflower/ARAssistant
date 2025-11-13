@@ -530,6 +530,54 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 211213146}
   m_CullTransparentMesh: 1
+--- !u!1 &567138187
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 567138188}
+  - component: {fileID: 567138189}
+  m_Layer: 0
+  m_Name: STTBridge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &567138188
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 567138187}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 517.79596, y: 1102.2274, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &567138189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 567138187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f6610921befa38419d2ff07ccff8494, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::STTBridge
+  partialText: {fileID: 33236032}
+  finalText: {fileID: 211213148}
+  languageTag: en-US
+  preferOffline: 0
 --- !u!1 &701687478
 GameObject:
   m_ObjectHideFlags: 0
@@ -1090,7 +1138,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1088750965
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1259,8 +1307,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1459519896}
-        m_TargetAssemblyTypeName: WhisperStreamSTT, Assembly-CSharp
+      - m_Target: {fileID: 567138189}
+        m_TargetAssemblyTypeName: STTBridge, Assembly-CSharp
         m_MethodName: OnToggleRecord
         m_Mode: 1
         m_Arguments:
@@ -1287,7 +1335,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1459519896
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1618,7 +1666,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssistantStreamController
   speakButton: {fileID: 1310595023}
   speakButtonImage: {fileID: 1310595021}
-  whisper: {fileID: 1459519896}
+  whisper: {fileID: 567138189}
   placer: {fileID: 1981930127}
   finalTextUI: {fileID: 211213148}
   speakingBoolParam: isSpeaking
@@ -1903,3 +1951,4 @@ SceneRoots:
   - {fileID: 866869679}
   - {fileID: 1060585668}
   - {fileID: 778440704}
+  - {fileID: 567138188}
