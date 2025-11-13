@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using TMPro;
 using UnityEngine.UI;
+using System.Collections;
 
 public class AssistantStreamController : MonoBehaviour
 {
@@ -22,6 +23,7 @@ public class AssistantStreamController : MonoBehaviour
     public ChatOnceClient chatOnce;              // assign a GO with ChatOnceClient
     public LocalAndroidTTSStreamer ttsStreamer;  // assign LocalTTS GO
     public StreamingAudioPlayer player;          // assign AudioStream GO
+    ClaimingPollingClient poller;
 
     [Header("Chunking")]
     [Range(1, 24)] public int minWordsPerChunk = 8;  // for /chat reply re-chunking
@@ -31,6 +33,88 @@ public class AssistantStreamController : MonoBehaviour
     ConversationMemory memory = new ConversationMemory(10);
     Animator avatarAnimator;
 
+    void Start()
+    {
+        poller = FindFirstObjectByType<ClaimingPollingClient>();
+        if (poller != null) poller.OnMessageClaimed += OnExternalClaimed;
+    }
+    void OnDestroy()
+    {
+        if (poller != null) poller.OnMessageClaimed -= OnExternalClaimed;
+    }
+
+
+    // called by the poller when it has claimed a message
+    void OnExternalClaimed(string id, string text)
+    {
+        Debug.Log("[Assistant] External claimed: " + id + " -> " + text);
+        StartCoroutine(HandleExternalDetected(id, text));
+    }
+
+    IEnumerator HandleExternalDetected(string id, string text)
+    {
+        // 1) Immediately treat as a final user utterance (same as OnUserFinalText)
+        // Show the user's detected input in the UI
+        if (finalTextUI) finalTextUI.text = text;
+
+        // Ensure avatar audio binding (so playback will be bound later)
+        EnsureAvatarAudioBinding();
+        if (!wired)
+        {
+            Debug.LogWarning("[Assistant] Avatar not placed; external input aborted.");
+            // We still might want to ack so it doesn't reappear — but better to not ack so demo can retry.
+            yield break;
+        }
+
+        // 2) Start the normal LLM flow (this sets llmBusy inside)
+        // Reuse your existing function so memory, etc. are used.
+        StartChatOnce(text);
+
+        // 3) Wait for assistant reply to arrive (FinalText will be changed by StartChatOnce)
+        // We know finalTextUI was set to the user text; wait until it changes or a timeout occurs.
+        float waitForReplyTimeout = 20f; // max wait for LLM reply (adjust as needed)
+        float t0 = Time.realtimeSinceStartup;
+        bool replyArrived = false;
+        while (Time.realtimeSinceStartup - t0 < waitForReplyTimeout)
+        {
+            // If finalText is not equal to the user text, LLM reply arrived and StartChatOnce already updated the UI.
+            if (finalTextUI && finalTextUI.text != text)
+            {
+                replyArrived = true;
+                break;
+            }
+            // Also if TTS started (player got enqueued), proceed to waiting for playback
+            if (ttsStreamer != null && !ttsStreamer.IsIdle()) { replyArrived = true; break; }
+            yield return null;
+        }
+
+        if (!replyArrived)
+        {
+            Debug.LogWarning("[Assistant] No assistant reply within timeout; acking to avoid re-delivery.");
+            // ack anyway (or you may prefer to not ack so server retries). We'll ack to avoid duplicate stuck messages.
+            if (poller != null) yield return StartCoroutine(poller.AckCoroutine(id));
+            yield break;
+        }
+
+        // 4) Wait for TTS playback to finish:
+        // Wait until both the TTS engine is idle AND the audio player has drained its buffer.
+        // If no TTS was produced (assistant reply might be empty or no TTS), this loop exits immediately.
+        while (true)
+        {
+            bool ttsBusy = (ttsStreamer != null && !ttsStreamer.IsIdle());
+            bool audioBusy = (player != null && player.IsPlayingOrBuffered());
+            if (!ttsBusy && !audioBusy) break;
+            yield return null;
+        }
+
+        // 5) ACK the server so message is consumed
+        if (poller != null)
+        {
+            yield return StartCoroutine(poller.AckCoroutine(id));
+        }
+
+        Debug.Log("[Assistant] External message processed and acked: " + id);
+    }
 
     void OnEnable()
     {
