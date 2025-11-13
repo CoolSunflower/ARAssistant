@@ -9,7 +9,7 @@ public class StreamingAudioPlayer : MonoBehaviour
 
     [Header("Buffering")]
     [Range(0f, 2f)] public float minStartBufferSec = 0.6f;   // wait before first Play()
-    [Range(0f, 2f)] public float reStartBufferSec  = 0.3f;   // if stopped, wait this much then Play()
+    [Range(0f, 2f)] public float reStartBufferSec = 0.3f;   // if stopped, wait this much then Play()
 
     int sampleRate = 22050;
     int channels = 1;
@@ -18,6 +18,7 @@ public class StreamingAudioPlayer : MonoBehaviour
     AudioClip clip;
     bool started;
     int clipRate, clipCh;
+    float emptySince = -1f;
 
     void Update()
     {
@@ -33,6 +34,29 @@ public class StreamingAudioPlayer : MonoBehaviour
             {
                 Debug.Log("[Player] Auto-restart AudioSource");
                 target.Play();
+            }
+        }
+
+        // ---- NEW: detect when playback truly finished (drained) ----
+        if (started && target)
+        {
+            int count;
+            lock (lockObj) count = q.Count;
+
+            if (count == 0)
+            {
+                if (emptySince < 0f) emptySince = Time.unscaledTime;
+                else if (Time.unscaledTime - emptySince > 0.35f) // drained for 350ms
+                {
+                    target.Stop();
+                    started = false;
+                    emptySince = -1f;
+                    // Debug.Log("[Player] Drained; stop and mark idle");
+                }
+            }
+            else
+            {
+                emptySince = -1f; // got data again
             }
         }
     }
@@ -125,5 +149,14 @@ public class StreamingAudioPlayer : MonoBehaviour
         started = false;
         if (target && target.isPlaying) target.Stop();
         Debug.Log("[Player] Reset stream");
+    }
+
+    public bool IsPlayingOrBuffered()
+    {
+        if (!target) return false;
+        int count; lock (lockObj) count = q.Count;
+        bool playing = target.isPlaying;
+        bool buffered = count > 0 || started;
+        return playing || buffered;
     }
 }

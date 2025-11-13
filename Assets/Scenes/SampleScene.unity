@@ -1057,6 +1057,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StreamingAudioPlayer
   target: {fileID: 0}
+  minStartBufferSec: 0.6
+  reStartBufferSec: 0.3
 --- !u!4 &1060585668
 Transform:
   m_ObjectHideFlags: 0
@@ -1102,7 +1104,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: com.whisper.unity::Whisper.WhisperManager
   logLevel: 1
-  modelPath: Whisper/ggml-tiny.en.bin
+  modelPath: Whisper/ggml-base.en-q5_1.bin
   isModelPathInStreamingAssets: 1
   initOnAwake: 1
   useGpu: 0
@@ -1614,14 +1616,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7890cd811aabcf7489d80208c0374895, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AssistantStreamController
+  speakButton: {fileID: 1310595023}
+  speakButtonImage: {fileID: 1310595021}
+  whisper: {fileID: 1459519896}
   placer: {fileID: 1981930127}
   finalTextUI: {fileID: 211213148}
-  sse: {fileID: 701687479}
+  speakingBoolParam: isSpeaking
+  chatOnce: {fileID: 778440703}
   ttsStreamer: {fileID: 866869678}
   player: {fileID: 1060585667}
-  sseUrlBase: https://ar-ai-worker.iamadarshgupta8.workers.dev/chat-sse?q=
-  chatOnce: {fileID: 778440703}
-  useSse: 0
+  minWordsPerChunk: 8
 --- !u!1 &2034165218
 GameObject:
   m_ObjectHideFlags: 0

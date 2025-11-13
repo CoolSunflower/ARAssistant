@@ -32,6 +32,8 @@ public class LocalAndroidTTSStreamer : MonoBehaviour
 #endif
     }
 
+    public bool IsIdle() => !running;
+
     public void ResetStream()
     {
         pending.Clear();

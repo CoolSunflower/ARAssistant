@@ -52,17 +52,26 @@ function sysPrompt() {
 /** ----------- Non-streaming ----------- */
 async function handleChat(req, env) {
   try {
-    const { text } = await req.json();
+    const { text, history = [] } = await req.json();
     if (!text || !text.trim()) {
       return withCORS(new Response("No text", { status: 400 }));
     }
 
+    // Build conversation: system + (last up to 10 turns) + current user
+    const messages = [{ role: "system", content: sysPrompt() }];
+    for (const t of history.slice(-10)) {
+      if (t && typeof t.user === "string" && t.user.trim()) {
+        messages.push({ role: "user", content: t.user });
+      }
+      if (t && typeof t.assistant === "string" && t.assistant.trim()) {
+        messages.push({ role: "assistant", content: t.assistant });
+      }
+    }
+    messages.push({ role: "user", content: text });
+
     const body = {
       model: env.OPENAI_MODEL || "gpt-4o-mini",
-      input: [
-        { role: "system", content: sysPrompt() },
-        { role: "user", content: text },
-      ],
+      input: messages,
     };
 
     const r = await fetch("https://api.openai.com/v1/responses", {

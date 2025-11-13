@@ -1,12 +1,22 @@
 using UnityEngine;
 using UnityEngine.Networking;
 using TMPro;
+using UnityEngine.UI;
 
 public class AssistantStreamController : MonoBehaviour
 {
     [Header("Scene refs")]
+    public UnityEngine.UI.Button speakButton; // assign your mic/speak button in Inspector
+    bool sttBusy;                             // updated by Whisper events
+    bool llmBusy;  // <— NEW: disable button during /chat network call
+    public UnityEngine.UI.Image speakButtonImage;
+
+    public WhisperStreamSTT whisper;
     public ARReticleAndPlace placer;
     public TMP_Text finalTextUI;
+
+    public string speakingBoolParam = "isSpeaking";    // Animator bool name
+
 
     [Header("Net / TTS / Audio")]
     public ChatOnceClient chatOnce;              // assign a GO with ChatOnceClient
@@ -18,16 +28,53 @@ public class AssistantStreamController : MonoBehaviour
 
     GameObject cachedAvatar;
     bool wired;
+    ConversationMemory memory = new ConversationMemory(10);
+    Animator avatarAnimator;
+
 
     void OnEnable()
     {
         WhisperStreamSTT.OnFinalUtterance += OnUserFinalText;
+        WhisperStreamSTT.OnSttBusyChanged += OnSttBusyChanged;   // <— add
     }
+
+    void Update()
+    {
+        // Button control
+        if (speakButton)
+        {
+            bool recording = whisper && whisper.IsRecording;              // user must be able to stop
+            bool ttsBusy = (ttsStreamer != null && !ttsStreamer.IsIdle());
+            bool audioBusy = (player != null && player.IsPlayingOrBuffered());
+            bool sttLock = sttBusy && !recording;                       // lock during finalizing (not during recording)
+            bool overallBusy = sttLock || llmBusy || ttsBusy || audioBusy;
+            speakButton.interactable = recording || !overallBusy;
+
+            if (speakButtonImage)
+            {
+                bool userSpeaking = whisper && whisper.IsRecording;
+                speakButtonImage.color = userSpeaking ? Color.red : Color.white;
+            }
+        }
+
+        // Animator “isSpeaking” toggle (Speaking when TTS working or audio buffered/playing)
+        if (avatarAnimator)
+        {
+            bool ttsBusy   = (ttsStreamer != null && !ttsStreamer.IsIdle());
+            bool audioBusy = (player != null && player.IsPlayingOrBuffered());
+            bool isSpeaking = ttsBusy || audioBusy;
+            avatarAnimator.SetBool(speakingBoolParam, isSpeaking);
+        }
+    }
+
 
     void OnDisable()
     {
         WhisperStreamSTT.OnFinalUtterance -= OnUserFinalText;
+        WhisperStreamSTT.OnSttBusyChanged -= OnSttBusyChanged;   // <— add
     }
+
+    void OnSttBusyChanged(bool busy) { sttBusy = busy; }
 
     public void OnUserFinalText(string text)
     {
@@ -36,7 +83,7 @@ public class AssistantStreamController : MonoBehaviour
 
         EnsureAvatarAudioBinding();
         if (!wired) { Debug.LogWarning("[Assistant] Avatar not placed; aborting."); return; }
-
+        if (speakButton) speakButton.interactable = false;   // disable during request+speech
         StartChatOnce(text);
     }
 
@@ -55,6 +102,8 @@ public class AssistantStreamController : MonoBehaviour
         player.ResetStream();
         cachedAvatar = avatar; wired = true;
 
+        avatarAnimator = avatar.GetComponentInChildren<Animator>();
+
         Debug.Log("Bound StreamingAudioPlayer to avatar Lipsync AudioSource");
     }
 
@@ -63,14 +112,26 @@ public class AssistantStreamController : MonoBehaviour
         if (!chatOnce) { Debug.LogError("[Assistant] ChatOnceClient missing"); return; }
         ttsStreamer.ResetStream();
 
-        StartCoroutine(chatOnce.Ask(query, full =>
+        llmBusy = true;  // mark busy during /chat
+
+        StartCoroutine(chatOnce.Ask(query, memory.Snapshot(), full =>
         {
+            llmBusy = false;  // re-enable logic will be handled by Update()
+
             if (string.IsNullOrWhiteSpace(full))
             {
                 Debug.LogError("[Assistant] Empty reply from /chat");
+                if (finalTextUI) finalTextUI.text = "(no reply)";
                 return;
             }
 
+            // 1) Show assistant reply in FinalText
+            if (finalTextUI) finalTextUI.text = full;
+
+            // 2) Add to memory (user -> assistant)
+            memory.Add(query, full);
+
+            // 3) Speak in chunks
             foreach (var part in SplitIntoChunks(full, minWordsPerChunk))
                 ttsStreamer.SpeakChunk(part);
         }));

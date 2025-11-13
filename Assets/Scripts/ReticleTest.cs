@@ -16,9 +16,12 @@ public class ARReticleAndPlace : MonoBehaviour
     GameObject reticle;
     static List<ARRaycastHit> hits = new();
 
+    ARPlaneManager planeMgr;
+
     void Awake()
     {
         if (!raycaster) raycaster = GetComponent<ARRaycastManager>();
+        planeMgr = GetComponent<ARPlaneManager>();
         if (reticlePrefab) reticle = Instantiate(reticlePrefab);
         if (reticle) reticle.SetActive(false);
     }
@@ -44,12 +47,12 @@ public class ARReticleAndPlace : MonoBehaviour
         else if (reticle) reticle.SetActive(false);
 
         // if avatar is placed, make it orient toward camera
-        if (placedAvatar)
-        {
-            var camPos = Camera.main.transform.position;
-            var lookPos = new Vector3(camPos.x, placedAvatar.transform.position.y, camPos.z);
-            placedAvatar.transform.LookAt(lookPos);
-        }
+        // if (placedAvatar)
+        // {
+        //     var camPos = Camera.main.transform.position;
+        //     var lookPos = new Vector3(camPos.x, placedAvatar.transform.position.y, camPos.z);
+        //     placedAvatar.transform.LookAt(lookPos);
+        // }
 
         // tap to place
         if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
@@ -71,13 +74,21 @@ public class ARReticleAndPlace : MonoBehaviour
             if (!placedAvatar)
             {
                 placedAvatar = Instantiate(avatarPrefab, pose.position, pose.rotation);
-                placedAvatar.transform.localScale = Vector3.one * 0.1f;
+                placedAvatar.transform.localScale = Vector3.one * 0.5f;
                 placedAvatar.transform.Rotate(0f, 180f, 0f, Space.Self);
+
+                if (planeMgr)
+                {
+                    planeMgr.planePrefab = null;                 // Plane Prefab -> None
+                    foreach (var plane in planeMgr.trackables)   // hide existing plane visuals
+                        plane.gameObject.SetActive(false);
+                    planeMgr.enabled = false;                    // stop plane updates
+                }
             }
             else
             {
                 placedAvatar.transform.SetPositionAndRotation(pose.position, pose.rotation);
-                placedAvatar.transform.localScale = Vector3.one * 0.1f;
+                placedAvatar.transform.localScale = Vector3.one * 0.5f;
                 placedAvatar.transform.Rotate(0f, 180f, 0f, Space.Self);
             }
         }

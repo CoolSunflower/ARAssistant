@@ -24,6 +24,8 @@ public class WhisperStreamSTT : MonoBehaviour
 
     [Header("Events")]
     public static System.Action<string> OnFinalUtterance; 
+    public static System.Action<bool> OnSttBusyChanged; // true = busy, false = idle
+    public bool IsRecording => isRecording;
 
     private string micDevice;
     private AudioClip ringClip;                 // looping microphone capture
@@ -74,6 +76,7 @@ public class WhisperStreamSTT : MonoBehaviour
         isRecording = true;
         partialText.text = "(listening...)";
         finalText.text = "";
+        OnSttBusyChanged?.Invoke(true);
 
         startSample = Microphone.GetPosition(micDevice);
         lastProcessedSample = startSample;
@@ -86,6 +89,7 @@ public class WhisperStreamSTT : MonoBehaviour
     {
         if (!isRecording) return;
         isRecording = false;
+        OnSttBusyChanged?.Invoke(true); // still busy while we build final transcript
 
         if (streamCo != null) StopCoroutine(streamCo);
 
@@ -154,6 +158,7 @@ public class WhisperStreamSTT : MonoBehaviour
         partialText.text = "";
         finalText.text = string.IsNullOrEmpty(text) ? "(no text)" : text;
         OnFinalUtterance?.Invoke(finalText.text);
+        OnSttBusyChanged?.Invoke(false); // STT fully done
     }
 
     // ---- helpers ----
