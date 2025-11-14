@@ -108,7 +108,7 @@ Copy the ngrok URL (e.g., `https://abc123.ngrok-free.app`) - you'll need this fo
 #### Step 3: Configure the Sign Language Frontend
 
 ```bash
-cd sign-language-backend/Sign-Language-Recognition-Using-Mediapipe-and-React
+cd sign-language-backend/
 npm install
 ```
 
@@ -170,7 +170,7 @@ The system currently recognizes the following ASL signs:
 - Please
 - Thanks
 - Yes
-- (and more based on the trained model)
+- All the alphabets
 
 ## Project Structure
 
@@ -189,9 +189,8 @@ ARAssistant/
 │   │   └── index.js
 │   └── wrangler.toml
 ├── sign-language-backend/          # React + MediaPipe detector
-│   └── Sign-Language-Recognition-Using-Mediapipe-and-React/
-│       ├── src/
-│       └── public/
+│   └── src/
+│   └── public/
 └── sign-language-ngrok/            # Message broker server
     └── src/
         └── index.js
