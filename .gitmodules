@@ -1,0 +1,3 @@
+[submodule "sign-language-backend"]
+	path = sign-language-backend
+	url = https://github.com/CoolSunflower/ARAI-SignLanguage

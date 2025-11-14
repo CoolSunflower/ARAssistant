@@ -48,7 +48,14 @@ The system consists of three main components:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/CoolSunflower/ARAssistant.git
+# clone with submodules
+git clone --recurse-submodules https://github.com/CoolSunflower/ARAssistant.git
+
+# or after cloning
+# git submodule update --init --recursive
+# to update submodules to latest remote commits
+# git submodule update --remote --merge
+
 cd ARAssistant
 ```
 
