@@ -1216,7 +1216,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bfcfefdba1984c94bb17df6cb70c6ab5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ClaimingPollingClient
-  baseUrl: https://e5184793e27d.ngrok-free.app
+  baseUrl: https://7f2c7d6fcbd7.ngrok-free.app
   apiKey: mysecret
   pollInterval: 1
   clientId: 

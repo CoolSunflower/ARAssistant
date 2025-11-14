@@ -1,6 +1,13 @@
-# Accessibility-focused AR Multimodal AI Assistant
+# Accessibility-focused AR Multimodal AI Assistant - CS560 Course Project
 
 An accessible, multimodal AR assistant that you can interact with through speech, gestures, and sign language. The assistant appears as a humanoid avatar in your real-world environment, responding with synchronized speech, lip movements, and facial animations.
+
+Done by:
+```
+Adarsh Gupta (220101003)
+Sharvil Patel (220101091)
+Parv Aggarwal (220101124) 
+```
 
 ## Overview
 
@@ -267,7 +274,3 @@ This project is provided as-is for educational and research purposes.
 - uLipSync for lip synchronization
 - Cloudflare for serverless infrastructure
 - AR Foundation team for AR capabilities
-
----
-
-For detailed technical information, see [REPORT.md](REPORT.md).
